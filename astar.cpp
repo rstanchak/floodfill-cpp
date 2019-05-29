@@ -8,68 +8,131 @@
 #include <queue> /* priority_queue */
 #include <algorithm> /* reverse */
 
+/*
+ * Helper class to work with 2D map represented in ascii
+ */
 class Map {
- public:
+ protected:
+    // rows of the map
     std::vector<std::string> grid_;
+    // map dimensions
     size_t w_, h_;
+
+ public:
     explicit Map(std::vector<std::string> map) :
       grid_{map},
       w_{map[0].size()},
       h_{map.size()} {
-      }
+    }
+
+    /**
+     * determine if the point (x, y) is a wall or not
+     *
+     * points outside the map are considered wall
+     */
     bool is_wall(int x, int y) const {
       if (x<0 || x >= w_ || y<0 || y >= h_) return true;
       return grid_[y][x] == '|';
     }
-    bool is_end(int x, int y) const {
+
+    /**
+     * determine if the point (x, y) is the goal 
+     */
+    bool is_goal(int x, int y) const {
       if (x<0 || x >= w_ || y<0 || y >= h_) return false;
       return grid_[y][x] == 'F';
     }
+
+    /**
+     * determine if the point (x, y) is the start 
+     */
     bool is_start(int x, int y) const {
       if (x<0 || x >= w_ || y<0 || y >= h_) return false;
       return grid_[y][x] == 'S';
     }
+
+    /**
+     * map width accessor
+     */
+    const size_t & width() const { return w_; }
+
+    /**
+     * map height accessor
+     */
+    const size_t & height() const { return h_; }
+
+    /**
+     * transform the point x, y to a graphnode id
+     * 
+     * invalid if x,y is outside the map
+     */
+    int xy_to_id(int x, int y) const {
+      return w_*y + x;
+    }
+
+    /**
+     * transform the graph node id to the corresponding x,y point
+     * 
+     * valid iff 0 <= id < width*height
+     */
+    std::pair<int, int> id_to_xy(int id) const {
+      return {id % width(), id / width()};
+    }
+
+    /**
+     * return the action to get from the node prev_id to id
+     * 
+     * assumes prev_id and id are adjacent
+     */
+    char ids_to_action(int prev_id, int id) {
+      auto prev_pt = this->id_to_xy(prev_id);
+      auto pt = this->id_to_xy(id);
+
+      if (prev_pt.first < pt.first) return 'R';
+      if (prev_pt.first > pt.first) return 'L';
+      if (prev_pt.second < pt.second) return 'D';
+      if (prev_pt.second > pt.second) return 'U';
+      return '.';
+    }
 };
 
-int xy_to_id(int w, int h, int x, int y) {
-  return w*y + x;
-}
 
-std::pair<int, int> id_to_xy(int w, int h, int id) {
-  return {id % w, id / w};
-}
 
 class Graph {
- public:
     std::vector<std::vector<int>> adj;
-    int start_, end_;
+    int start_, goal_;
 
+ public:
+    Graph() : start_{-1}, goal_{-1} {}
     void buildFromMap(const Map & map) {
-      adj.resize(map.h_ * map.w_);
-      for (int i=0; i < map.h_; ++i) {
-        for (int j=0; j < map.w_; ++j) {
-          int id = xy_to_id(map.w_, map.h_, j, i);
+      adj.resize(map.height() * map.width());
+      for (int i=0; i < map.height(); ++i) {
+        for (int j=0; j < map.width(); ++j) {
+          int id = map.xy_to_id(j, i);
 
           if (map.is_wall(j, i)) continue;
 
           if (map.is_start(j, i)) start_ = id;
-          if (map.is_end(j, i)) end_ = id;
+          if (map.is_goal(j, i)) goal_ = id;
 
           if (!map.is_wall(j-1, i)) {
-            adj[id].push_back(xy_to_id(map.w_, map.h_, j-1, i));
+            adj[id].push_back(map.xy_to_id(j-1, i));
           }
           if (!map.is_wall(j+1, i)) {
-            adj[id].push_back(xy_to_id(map.w_, map.h_, j+1, i));
+            adj[id].push_back(map.xy_to_id(j+1, i));
           }
           if (!map.is_wall(j, i-1)) {
-            adj[id].push_back(xy_to_id(map.w_, map.h_, j, i-1));
+            adj[id].push_back(map.xy_to_id(j, i-1));
           }
           if (!map.is_wall(j, i+1)) {
-            adj[id].push_back(xy_to_id(map.w_, map.h_, j, i+1));
+            adj[id].push_back(map.xy_to_id(j, i+1));
           }
         }
       }
     }
+    const int & start() const { return start_; }
+    const int & goal() const { return goal_; }
+    const std::vector<int> & neightbors(int id) const { return adj[id]; }
 };
 
 class Heuristic {
@@ -146,7 +209,7 @@ std::vector<int> a_star(const Graph & graph,
 
     closed_set.insert(current);
 
-    for (int neighbor_id : graph.adj[current]) {
+    for (int neighbor_id : graph.neightbors(current)) {
       if (closed_set.count(neighbor_id) > 0) {
         // skip already processed neighbors
         continue;
@@ -171,27 +234,6 @@ std::vector<int> a_star(const Graph & graph,
   return {};
 }
 
-std::vector<char> id_to_action(const std::vector<int> & path) {
-    std::vector<char> actions;
-    int prev_id = -1;
-    for (int id : path) {
-        if (prev_id >= 0) {
-            int diff = id - prev_id;
-            // nodes are enumerated left to right top to bottom
-            // assuming valid steps...
-            // diff of 1 is one step right
-            if (diff == 1) actions.push_back('R');
-            // diff of -1 is one step left
-            else if (diff == -1) actions.push_back('L');
-            // diff < 0 is step up
-            else if (diff < 0) actions.push_back('U');
-            // diff > 0 is step down
-            else if (diff > 0) actions.push_back('D');
-        }
-        prev_id = id;
-    }
-    return actions;
-}
 
 int main() {
     std::vector<std::string> rows;
@@ -209,12 +251,16 @@ int main() {
     graph.buildFromMap(map);
 
     auto path = a_star(graph,
-            L1Heuristic(map.w_, map.h_),
-            graph.start_,
-            graph.end_);
+            L1Heuristic(map.width(), map.height()),
+            graph.start(),
+            graph.goal());
 
-    for (char c : id_to_action(path)) {
-        std::cout << c;
+    int prev_id = -1;
+    for (int id : path) {
+      if (prev_id >= 0) {
+        std::cout << map.ids_to_action(prev_id, id);
+      }
+      prev_id = id;
     }
     std::cout << std::endl;
     return 0;
