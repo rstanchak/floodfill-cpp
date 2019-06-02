@@ -1,0 +1,2 @@
+#!/bin/sh
+$(dirname $0)/../build/src/floodfill < $(dirname $0)/input1.txt
