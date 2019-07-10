@@ -19,15 +19,15 @@ void bitmap_id_to_xy(const Bitmap & bmp, int id, int & retarg_x, int & retarg_y)
 
 class ColorBitmapPixelOnVisit : public GraphTraversal::VisitCallback {
   protected:
-    Bitmap & bmp_;
+    Bitmap * bmp_;
     char color_;
 
   public:
-    ColorBitmapPixelOnVisit(Bitmap & bitmap, char color) : bmp_{bitmap}, color_{color} {}
+    ColorBitmapPixelOnVisit(Bitmap & bitmap, char color) : bmp_{&bitmap}, color_{color} {}
     virtual void operator ()(int node_id) const {
       int x,y;
-      bitmap_id_to_xy(bmp_, node_id, x, y);
-      bmp_.set(x, y, color_);
+      bitmap_id_to_xy(*bmp_, node_id, x, y);
+      bmp_->set(x, y, color_);
     }
 };
 
