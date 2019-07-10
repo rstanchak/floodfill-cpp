@@ -5,53 +5,53 @@
 #include <iostream>
 
 #include "Graph.hpp"
-#include "Map.hpp"
-#include "AStar.hpp"
+#include "Bitmap.hpp"
+#include "GraphTraversal.hpp"
 
-/**
- * A* heuristic.  The cost between any two nodes 
- * in a 2D grid is at least the L1 distance
- * i.e delta_x + delta_y
- */
-class L1Heuristic : public AStar::Heuristic {
- public:
-    int w_, h_;
-    L1Heuristic(int w, int h): w_{w}, h_{h} {
-    }
-    int operator()(int start, int end) const {
-      // decode id into x,y coordinates
-      int startx, starty, endx, endy;
-      startx = start % w_;
-      starty = start / w_;
-      endx = end % w_;
-      endy = end / w_;
-      // use L1 distance as heuristic
-      return abs(endy-starty) + abs(endx-startx);
+int bitmap_xy_to_id(const Bitmap & bmp, int x, int y) {
+  return y * bmp.width() + x;
+}
+
+void bitmap_id_to_xy(const Bitmap & bmp, int id, int & retarg_x, int & retarg_y) {
+    retarg_x = id % bmp.width();
+    retarg_y = id / bmp.width();
+}
+
+class ColorBitmapPixelOnVisit : public GraphTraversal::VisitCallback {
+  protected:
+    Bitmap & bmp_;
+    char color_;
+
+  public:
+    ColorBitmapPixelOnVisit(Bitmap & bitmap, char color) : bmp_{bitmap}, color_{color} {}
+    virtual void operator ()(int node_id) const {
+      int x,y;
+      bitmap_id_to_xy(bmp_, node_id, x, y);
+      bmp_.set(x, y, color_);
     }
 };
 
 /** helper function to build a graph
- * from the map
+ * from the bmp
  */
-Graph buildGraphFromMap(const Map & map) {
-  Graph graph(map.height() * map.width());
-  for (int i=0; i < map.height(); ++i) {
-    for (int j=0; j < map.width(); ++j) {
-      int id = map.xy_to_id(j, i);
+Graph buildGraphFromBitmap(const Bitmap & bmp) {
+  Graph graph(bmp.height() * bmp.width());
+  for (int i=0; i < bmp.height(); ++i) {
+    for (int j=0; j < bmp.width(); ++j) {
+      int id = bitmap_xy_to_id(bmp, j, i);
+      int color = bmp.get(j, i);
 
-      if (map.is_wall(j, i)) continue;
-
-      if (!map.is_wall(j-1, i)) {
-        graph.add_edge(id, map.xy_to_id(j-1, i));
+      if (bmp.get(j-1, i) == color) {
+        graph.add_edge(id, bitmap_xy_to_id(bmp, j-1, i));
       }
-      if (!map.is_wall(j+1, i)) {
-        graph.add_edge(id, map.xy_to_id(j+1, i));
+      if (bmp.get(j+1, i) == color) {
+        graph.add_edge(id, bitmap_xy_to_id(bmp, j+1, i));
       }
-      if (!map.is_wall(j, i-1)) {
-        graph.add_edge(id, map.xy_to_id(j, i-1));
+      if (bmp.get(j, i-1) == color) {
+        graph.add_edge(id, bitmap_xy_to_id(bmp, j, i-1));
       }
-      if (!map.is_wall(j, i+1)) {
-        graph.add_edge(id, map.xy_to_id(j, i+1));
+      if (bmp.get(j, i+1) == color) {
+        graph.add_edge(id, bitmap_xy_to_id(bmp, j, i+1));
       }
     }
   }
@@ -59,36 +59,25 @@ Graph buildGraphFromMap(const Map & map) {
 }
 
 int main() {
-    std::vector<std::string> rows;
+    // 1. read the input bmp
+    Bitmap bmp;
+    std::cin >> bmp;
 
-    // 1. read the input map
-    int n;
-    std::cin >> n;
+    // 2. read the start (row, col)
+    int row, col;
+    std::cin >> row >> col;
 
-    for (int i=0; i < n; ++i) {
-        std::string s;
-        std::cin >> s;
-        rows.push_back(s);
-    }
-    Map map{rows};
+    // 3. read the target color
+    char target_color;
+    std::cin >> target_color;
 
-    // 2. convert it to a graph
-    Graph graph = buildGraphFromMap(map);
+    // 4. convert it to a graph
+    Graph graph = buildGraphFromBitmap(bmp);
 
-    // 3. search for the shortest path between start and goal
-    auto path = AStar::search(graph,
-            L1Heuristic(map.width(), map.height()),
-            map.start_id(),
-            map.goal_id());
+    // 5. visit all nodes connected to start_id
+    int start_id = bitmap_xy_to_id(bmp, col, row);
+    GraphTraversal::bfs(graph, start_id, ColorBitmapPixelOnVisit(bmp, target_color));
 
-    // 4. map the nodes in the path to actions
-    int prev_id = -1;
-    for (int id : path) {
-      if (prev_id >= 0) {
-        std::cout << map.ids_to_action(prev_id, id);
-      }
-      prev_id = id;
-    }
-    std::cout << std::endl;
+    std::cout << bmp;
     return 0;
 }
