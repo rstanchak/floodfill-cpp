@@ -1,3 +1,3 @@
-[![Build Status](https://travis-ci.com/rstanchak/astar-cpp.svg?branch=master)](https://travis-ci.com/rstanchak/astar-cpp)
+[![Build Status](https://travis-ci.com/rstanchak/floodfill-cpp.svg?branch=master)](https://travis-ci.com/rstanchak/floodfill-cpp)
 
-This is my A* implementation
+This is my flood fill implementation
