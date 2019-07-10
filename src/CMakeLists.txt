@@ -1,1 +1,1 @@
-add_executable(astar AStar.cpp main.cpp)
+add_executable(floodfill GraphTraversal.cpp main.cpp)
